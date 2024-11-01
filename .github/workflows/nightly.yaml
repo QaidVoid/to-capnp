@@ -1,0 +1,70 @@
+name: to-capnp nightly
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  
+
+permissions:
+  contents: write
+
+jobs:
+  remove-nightly-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove existing release
+        run: |
+          gh release delete nightly --cleanup-tag || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  publish-nightly:
+    name: Publish nightly binaries
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - {
+              NAME: x86_64-linux,
+              TARGET: x86_64-unknown-linux-musl,
+            }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            --allow-unauthenticated musl-tools b3sum capnproto
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.build.TARGET }}
+
+      - name: Build and prepare nightly binary
+        shell: bash
+        run: |
+          cargo build --release --target=${{ matrix.build.TARGET }}
+          mkdir -p nightly
+          cp "target/${{ matrix.build.TARGET }}/release/to-capnp" nightly/to-capnp-nightly-${{ matrix.build.NAME }}
+          b3sum nightly/to-capnp-nightly-${{ matrix.build.NAME }} > nightly/to-capnp-nightly-${{ matrix.build.NAME }}.b3sum
+
+      - name: Upload nightly binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nightly/*
+          tag_name: nightly
+          name: "Nightly Build"
+          body: "This is an automated nightly build of to-capnp."
+          prerelease: true
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

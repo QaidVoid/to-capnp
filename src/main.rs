@@ -1,6 +1,7 @@
 use capnp::{message, serialize_packed};
 use serde::{self, Deserialize};
 use std::collections::HashMap;
+use std::env::consts::ARCH;
 use std::fs::{self, File};
 use std::{env, io};
 
@@ -85,12 +86,20 @@ fn main() -> io::Result<()> {
             pkg_builder.set_category(&package.category);
             pkg_builder.set_extra_bins(&package.extra_bins);
             pkg_builder.set_icon(&package.icon);
+            let family = package
+                .download_url
+                .split('/')
+                .rev()
+                .nth(1)
+                .map(|v| v.to_owned())
+                .filter(|v| v != ARCH);
+            if let Some(family) = family {
+                pkg_builder.set_family(&family);
+            }
         }
     }
-    let mut output = File::create(output_file)?;
-    serialize_packed::write_message(&mut output, &message).unwrap();
-
-    println!("Successfully converted {} to {}", input_file, output_file);
+    let mut output_file = File::create(output_file)?;
+    serialize_packed::write_message(&mut output_file, &message).unwrap();
 
     Ok(())
 }

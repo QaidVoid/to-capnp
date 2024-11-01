@@ -18,6 +18,7 @@ struct Package {
   extraBins @14: Text;
   icon @15: Text;
   desktop @16: Text;
+  family @17: Text;
 }
 
 struct Collection {
